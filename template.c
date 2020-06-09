@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <stdbool.h>
 #include <math.h>
 #include "cpu_time.c"
 
@@ -9,6 +10,7 @@
 #define binHeight   3210.0  /* the height of bin */
 #define binArea     binWidth*binHeight  /* the area of bin */
 #define TIMELIM     300 /* the time limit for the algorithm in seconds */
+#define SIZE_OF_ARRAY(array)    (sizeof(array)/sizeof(array[0]))
 
 /* data of BPP instance */
 typedef struct{
@@ -166,8 +168,8 @@ int is_feasible(Vdata *vdata,RectData *rectdata){
           if(flag == 0)
             break;
         }
-        else
-          break;
+        //else
+          //break;
       }
       if(flag == 0)
         break;
@@ -189,12 +191,13 @@ int is_feasible(Vdata *vdata,RectData *rectdata){
 /***** check the overlap rectangle *************************************/
 /***** NEVER MODIFY THIS SUBROUTINE! *****************************************/
 int check_overlap(int x1,int w1,int y1,int h1,int x2,int w2,int y2,int h2){
-  int flag = 1;
-  if(x1 + w1 > x2 && y1 + h1 > y2){
-    if(x2 + w2 > x1 && y2 + h2 > y1){
-      flag = 0; printf("rectangle overlap\n");
+
+    int flag = 1;
+    if(x1 + w1 > x2 && y1 + h1 > y2){
+        if(x2 + w2 > x1 && y2 + h2 > y1){
+            flag = 0; printf("rectangle overlap\n");
+        }
     }
-  }
   return flag;
 }
 
@@ -206,9 +209,15 @@ void recompute_obj(Vdata *vdata,RectData *rectdata){
     exit(1);
   }
   int n = rectdata->NumberofRect;
-  printf("number of used bin:%d \nfilling rate = %.2f%%\n",vdata->bestsolB[n - 1] + 1,compute_cost(vdata,rectdata));
+  int NumberofBin = 0;;
+  for(int i = 0;i < n;i++){
+    if(NumberofBin < vdata->bestsolB[i])
+      NumberofBin = vdata->bestsolB[i];
+  }
+  printf("number of used bin:%d \nfilling rate = %.2f%%\n",NumberofBin + 1,compute_cost(vdata,rectdata));
   printf("time for the search:    %7.2f seconds\n",vdata->endtime - vdata->starttime);
   printf("time to read the instance: %7.2f seconds\n",vdata->starttime - vdata->timebird);
+  printf("elapsed time: %fs\n",cpu_time() - vdata->starttime);
 }
 
 /***** output the tex file in the Place_VIEW format **********************************/
@@ -217,7 +226,7 @@ void output_viwe_file(char *filename,Vdata *vdata,RectData *rectdata){
   FILE *fp;
   fp = fopen(filename,"w");
   if(fp == NULL){
-    printf("%sファイルが開けません\n",filename);
+    printf("file is not opened: %s\n",filename);
     return;
   }
   fprintf(fp,"\\documentclass[a4paper]{article}\n");
@@ -232,6 +241,21 @@ void output_viwe_file(char *filename,Vdata *vdata,RectData *rectdata){
   int *w = vdata->bestsolW;
   int *h = vdata->bestsolH;
   int *b = vdata->bestsolB;
+    
+  int j,temp=0;
+  for(i = 0;i < n;i++){
+    for(j = n-1;j>i;j--){
+      if(b[j-1]>b[j]){
+        temp = id[j-1]; id[j-1] = id[j]; id[j] = temp;
+        temp = x[j-1]; x[j-1] = x[j]; x[j] = temp;
+        temp = y[j-1]; y[j-1] = y[j]; y[j] = temp;
+        temp = w[j-1]; w[j-1] = w[j]; w[j] = temp;
+        temp = h[j-1]; h[j-1] = h[j]; h[j] = temp;
+        temp = b[j-1]; b[j-1] = b[j]; b[j] = temp;
+      }
+    }
+  }
+    
   double s = 0.002;
   for(i = 0;i < n;i++){
     if(i == 0){
@@ -271,7 +295,296 @@ void output_viwe_file(char *filename,Vdata *vdata,RectData *rectdata){
   }
 }
 
-/***** main ******************************************************************/
+// 降順ソート用関数
+int compare_int(const void *a, const void *b){
+  return *(int*)b - *(int*)a;
+}
+
+// 指定された要素が配列に含まれている数を返す関数
+size_t array_count_values(const int* array, size_t size, int value){
+  size_t count = 0;
+  for (size_t i = 0; i < size; ++i){
+    if (array[i] == value) {
+      ++count;
+    }
+  }
+  return count;
+}
+
+int sum,i,j = 0;
+// indexを受け取り、そのindexの属する列の最大幅を返す関数
+int indexToWidthOfCol(int index, int n, int *NumRectInCol, int *WidthOfCol){
+	for(i = j;i < n;i++){
+    sum += NumRectInCol[i];
+    if(sum >= index){
+      j = i + 1;
+      return WidthOfCol[i];
+      break;
+    }
+  }
+  return 0;
+}
+
+// 列のindex番号を受け取り、その列番号の属する列の〇〇を返す
+int indexOfColToBestSol(int index, int *bestsol, int *NumRectInCol,int count){
+  sum = 0;
+	for(i = 0;i < index;i++){
+    sum += NumRectInCol[i];
+  }
+  return bestsol[sum+count];
+}
+
+// ビン番号を受け取り、そのビン番号の右端のx座標を返す
+int binIdToLastX(int binId,int n, int *bestsolB, int *bestsolX){
+  int x = -99;
+	for(i = 0;i < n;i++){
+    if(binId == bestsolB[i]){
+      if(bestsolX[i] > x){
+        x = bestsolX[i];
+      }
+    }
+  }
+  return x;
+}
+
+// ビン番号を受け取り、そのビン番号の右端のx座標を持つアイテムの最大幅を返す
+int binIdToLastWidth(int binId,int n, int *bestsolB, int *bestsolX,int *bestsolW){
+  int x = -99;
+  int width = -99;
+	for(i = 0;i < n;i++){
+    if(binId == bestsolB[i]){
+      if(bestsolX[i] > x){
+        x = bestsolX[i];
+        width = bestsolW[i];
+      }
+    }
+  }
+  return width;
+}
+
+void my_algorithm(RectData *rectdata, Vdata *vdata){
+	int n = rectdata->NumberofRect;
+	int *NumRectInCol = (int *)malloc_e(n * sizeof(int)); // 1つの列に入っている長方形の個数
+	int *WidthOfCol = (int *)malloc_e(n * sizeof(int)); // 1つの列の最大width
+	int i,k,l,m,p,h,w,totalHeight,tmp = 0;
+	int columnPos = 0; // どの列なのか
+	int width = 0;
+	int count = 0;
+  int count2 = 0;
+  bool isTrue = true;
+  int dataWidth[n]; // アイテムのwidthを降順でソートした配列
+  int dataWidthIndex[n]; // アイテムのwidthを降順でソートした配列(index番号を保持)
+  int uniqIndex[n]; // 一度確定したIndex番号を保持
+  int binIds[n]; // ビンIDを保持する配列
+  int selectedWidth[n]; // 選ばれたwidth値を保持する配列
+  int selectedX[n]; // 選ばれたX座標を保持する配列
+  int selectedXSorted[n]; // 選ばれたX座標を大きい順で保持する配列
+
+	for(i = 0;i < n;i++){
+		NumRectInCol[i] = -99; 
+		WidthOfCol[i] = -99;
+    dataWidthIndex[i] = 0;
+    uniqIndex[i] = 0;    
+    binIds[i] = -99;
+    selectedWidth[i] = -99;
+    selectedX[i] = -99;
+    selectedXSorted[i] = -99;
+	}
+
+	for(i = 0;i < n;i++){
+    dataWidth[i] = rectdata->width[i];
+  }
+
+  qsort(dataWidth, n, sizeof(int), compare_int);
+
+  for(i = 0;i < n;i++){
+    for(k = 0;k < n;k++){
+      if(dataWidth[i] == rectdata->width[k] && !(array_count_values(uniqIndex, SIZE_OF_ARRAY(uniqIndex), k))){
+        dataWidthIndex[i] = k;
+        uniqIndex[count] = k;
+        count++;
+        break;
+      }
+    }
+  }
+
+	count = 0;
+	// ビンの高さを超えない範囲で、アイテムを積み重ねていく/超えてしまった場合、横に並べる
+  for(i = 0;i < n;i++){
+    h = rectdata->height[dataWidthIndex[i]]; 
+    w = rectdata->width[dataWidthIndex[i]];
+    totalHeight = totalHeight + h;
+    if(totalHeight > binHeight){
+      totalHeight = h;
+      if(i == n - 1){
+        WidthOfCol[columnPos] = width; width = w;
+        NumRectInCol[columnPos] = count; columnPos++;
+        WidthOfCol[columnPos] = width; NumRectInCol[columnPos] = 1; columnPos++;
+      }
+      else{
+        WidthOfCol[columnPos] = width; width = w;
+        NumRectInCol[columnPos] = count; columnPos++; count = 1;
+      }
+    }
+    else{
+      if(width < w)
+        width = w;
+      count++;
+      if(i == n - 1){
+        WidthOfCol[columnPos] = width; NumRectInCol[columnPos] = count; columnPos++;
+      }
+    }
+  }
+
+  // アイテムがどのビンに属するのかを決定/情報をvdataへ格納
+	int b = 0, x = 0, y = 0, j = 0; count = 0;
+	for(i = 0;i < columnPos;i++){
+    if(x + WidthOfCol[i] > binWidth){
+  		x = 0; y = 0; b++;
+		}
+		for(j = 0;j < NumRectInCol[i];j++){
+			vdata->bestsolId[count] = rectdata->id[dataWidthIndex[count]]; vdata->bestsolW[count] = rectdata->width[dataWidthIndex[count]]; vdata->bestsolH[count] = rectdata->height[dataWidthIndex[count]]; vdata->bestsolB[count] = b; vdata->bestsolX[count] = x; vdata->bestsolY[count] = y;
+			y = y + rectdata->height[dataWidthIndex[count]]; 
+			count++;
+		}
+		x = x + WidthOfCol[i]; 
+		y = 0;
+	}
+
+  int prevBinId = 0;
+  int binCounts = vdata->bestsolB[n - 1] + 1;
+  int lastEmptyWidthArray[binCounts];
+
+
+  // 以下、幅について考える
+
+  // 以下、空いたスペースにアイテムを積む、左に寄せるを繰り返す
+  count2 = 0;
+  while (isTrue){
+    for(i = 0;i < binCounts;i++){
+      lastEmptyWidthArray[i] = -99;
+    }
+
+    int prevX = -99;
+    int prevWidth = -99;
+
+    for(i = 0;i < binCounts;i++){
+      if(binIdToLastX(i,n,vdata->bestsolB,vdata->bestsolX) == -99){
+        lastEmptyWidthArray[i] = 0;
+      }else{
+        lastEmptyWidthArray[i] = 6000 - (binIdToLastX(i,n,vdata->bestsolB,vdata->bestsolX) + binIdToLastWidth(i,n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW));
+      }
+    }
+
+    // 詰める処理
+    for(i = 0;i < n;i++){ 
+      binIds[i] = -99;
+      selectedWidth[i] = -99;
+      selectedX[i] = -99;
+      selectedXSorted[i] = -99;
+    }
+
+    prevX = -99;
+    count = 0;
+    for(i = 0;i < binCounts;i++){
+      if(binIdToLastX(i,n,vdata->bestsolB,vdata->bestsolX) != -99){
+        for(j = 0;j < n;j++){
+          if(prevX != -99 && prevX != vdata->bestsolX[j] && i < vdata->bestsolB[j] && lastEmptyWidthArray[i] >= vdata->bestsolW[j]){
+            int binId = vdata->bestsolB[j];
+            int x = vdata->bestsolX[j];
+            binIds[count] = binId;
+            selectedWidth[count] = vdata->bestsolW[j];
+            selectedX[count] = x;
+            count++;
+
+            for(k = j;k < n;k++){
+              if(vdata->bestsolB[k] == binId && vdata->bestsolX[k] == x){
+                vdata->bestsolB[k] = i;
+                vdata->bestsolX[k] = 6000 - lastEmptyWidthArray[i];
+              }else{
+                break;
+              }
+            }
+            prevX = -99;
+            break;
+          }
+          prevX = vdata->bestsolX[j];
+        }
+      }
+    }
+
+    if(count == 0){
+      isTrue = false;
+    }
+
+    // 左にずらす処理
+
+    for(i = 0;i < n;i++){
+      selectedXSorted[i] = selectedX[i];
+    }
+
+    qsort(selectedXSorted, n, sizeof(int), compare_int);
+
+    for(i = 0;i < n;i++){
+      if(selectedXSorted[i] != -99){
+        for(j = 0;j < n;j++){
+          if(binIds[j] != -99 && selectedXSorted[i] == selectedX[j]){
+            for(k = 0;k < n;k++){
+              if(binIds[j] == vdata->bestsolB[k] && vdata->bestsolX[k] > selectedX[j]){
+                vdata->bestsolX[k] = vdata->bestsolX[k] - selectedWidth[j];
+              }
+            }
+            selectedX[j] = -99;
+          }
+        }
+      }
+    }
+    count2++;
+  }
+
+  // 以下、高さについて考える
+
+  count = 0;
+  for(i = 0;i < n;i++){
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+  // for(i = 0;i < binCounts;i++){
+  //   printf("[i]: %d\n",i);
+  //   printf("lastEmptyWidthArray: %d\n",lastEmptyWidthArray[i]);
+  //   printf("binIdToLastX(i,n,vdata->bestsolB,vdata->bestsolX): %d\n",binIdToLastX(i,n,vdata->bestsolB,vdata->bestsolX));
+  //   printf("binIdToLastWidth(i,n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW): %d\n",binIdToLastWidth(i,n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW));
+  // }
+
+  // for(i = 0;i < n;i++){
+  //   printf("binIds: %d\n",binIds[i]);
+  //   printf("selectedWidth: %d\n",selectedWidth[i]);
+  //   printf("selectedX: %d\n",selectedX[i]);
+  //   printf("selectedXSorted: %d\n",selectedXSorted[i]);
+  // }
+
+  for(i = 0;i < n;i++){
+    // printf("bestsolB: %d\n",vdata->bestsolB[i]);
+    // printf("bestsolId: %d\n",vdata->bestsolId[i]);
+    // printf("bestsolW: %d\n",vdata->bestsolW[i]);
+    // printf("bestsolH: %d\n",vdata->bestsolH[i]);
+    // printf("bestsolX: %d\n",vdata->bestsolX[i]);
+    // printf("bestsolY: %d\n",vdata->bestsolY[i]);
+  }
+
+	free(NumRectInCol); free(WidthOfCol);
+}
+
 int main(int argc,char *argv[]){
   RectData    rectdata;   /* data of rectangle instance */
   Vdata       vdata;      /* various data often needed during search */
@@ -280,30 +593,7 @@ int main(int argc,char *argv[]){
   read_rectFile((char*)argv[1],&rectdata,&vdata);
   vdata.starttime = cpu_time();
   
-  /*****
-    
-    Write your algorithm here.
-    Of course you can add your subroutines outside main().
-    At this point, the instance data is stored in the structure "rectdata".
-    
-    rectdata.id[k] :       the id of k th read rectangle
-    rectdata.height[k] :   the height of k th read rectangle
-    rectdata.width[k] :    the width of k th read rectangle
-    rectdata.Numberofrect :    the number of rectangles n
-    Never modify rectdata
-    
-    vdata.bestsolId[k] :    id of k th placed rectangle(k = 0,1,...,n-1)
-    vdata.bestsolX[k] :     x-coordinate of k th placed rectangle(k = 0,1,...,n-1)
-    vdata.bestsolY[k] :     y-coordinate of k th placed rectangle(k = 0,1,...,n-1)
-    vdata.bestsolW[k] :     width of k th placed rectangle(k = 0,1,...,n-1)
-    vdata.bestsolH[k] :     height of k th placed rectangle(k = 0,1,...,n-1)
-    vdata.bestsolB[k] :     bin of k th rectangle placed(k = 0,1,...,n-1)
-    
-    Store your best solution in vdata.bestsol*, then "recompute_obj()"
-    will compute its objective value and check its feasible.
-    In this competition, rotation of rectangle is not allowed.
-    
-    *****/
+	my_algorithm(&rectdata,&vdata);
   
   vdata.endtime = cpu_time();
   recompute_obj(&vdata,&rectdata);
