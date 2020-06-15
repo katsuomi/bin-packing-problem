@@ -362,6 +362,46 @@ int binIdToLastWidth(int binId,int n, int *bestsolB, int *bestsolX,int *bestsolW
   return width;
 }
 
+// x座標とビン番号を受け取り、その列のmaxWidthを返す
+int xToMaxWidth(int binId,int x,int n,int *bestsolB, int *bestsolX,int *bestsolW){
+  for(j = 0;j < n;j++){
+    if(bestsolB[j] == binId && bestsolX[j] == x){
+      return bestsolW[j];
+    }
+  }
+  return 0;
+}
+
+// x座標とビン番号を受け取り、その列の所持しているアイテムの数を返す
+int xToItemCounts(int binId,int x,int n,int *bestsolB, int *bestsolX,int *bestsolW){
+  int count = 0;
+  for(j = 0;j < n;j++){
+    if(bestsolB[j] == binId && bestsolX[j] == x){
+      count++;
+    }
+  }
+  return count;
+}
+
+// ビン番号を受け取り、そのビンが複数の列を所持しているかどうかを返す
+int binIdToIsManyCols(int binId,int n,int *bestsolB, int *bestsolX,int *bestsolW){
+  int count = 0;
+  int prevX = -99;
+
+  for(j = 0;j < n;j++){
+    if(bestsolB[j] == binId && prevX != bestsolX[j]){
+      prevX = bestsolX[j];
+      count++;
+    }
+  }
+
+  if(count == 1){
+    return 0;
+  }else{
+    return 1;
+  }
+}
+
 void my_algorithm(RectData *rectdata, Vdata *vdata){
 	int n = rectdata->NumberofRect;
 	int *NumRectInCol = (int *)malloc_e(n * sizeof(int)); // 1つの列に入っている長方形の個数
@@ -371,7 +411,9 @@ void my_algorithm(RectData *rectdata, Vdata *vdata){
 	int width = 0;
 	int count = 0;
   int count2 = 0;
+  int count3 = 0;
   bool isTrue = true;
+  bool isOk = false;
   int dataWidth[n]; // アイテムのwidthを降順でソートした配列
   int dataWidthIndex[n]; // アイテムのwidthを降順でソートした配列(index番号を保持)
   int uniqIndex[n]; // 一度確定したIndex番号を保持
@@ -456,17 +498,134 @@ void my_algorithm(RectData *rectdata, Vdata *vdata){
   int lastEmptyWidthArray[binCounts];
 
 
+
+  // 以下、高さについて考える
+  /***** 高さここから ******************************************************************/
+
+  int emptyHeights[columnPos]; // それぞれの列の高さの余りを保持する配列 一番最後の列に関しては、値が入っていない(-99)ので注意
+  int emptyHeightsBinIds[columnPos]; // ↑に対応するビンIDを保持する配列 一番最後の列に関しては、値が入っていない(-99)ので注意
+  int emptyHeightsX[columnPos]; // ↑に対応するX座標を保持する配列 一番最後の列に関しては、値が入っていない(-99)ので注意
+  int tmpBinIds[n];
+  int tmpXs[n];
+
+  for(i = 0;i < columnPos;i++){
+    emptyHeights[i] = -99;
+    emptyHeightsBinIds[i] = -99;
+    emptyHeightsX[i] = -99;
+  }
+
+  for(i = 0;i < n;i++){
+    tmpBinIds[i] = -99;
+    tmpXs[i] = -99;
+    uniqIndex[i] = -99;
+  }
+
+  int prevX = -99;
+  int tmpEmptyHeight = -99;  
+  int tmpEmptyHeightBinId = -99;
+  int tmpEmptyHeightX = -99;
+  count = 0;
+  for(i = 0;i < binCounts;i++){
+    isTrue = false;
+    for(j = 0;j < n;j++){
+      if(vdata->bestsolB[j] == i){
+        if(binIdToIsManyCols(vdata->bestsolB[j],n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW) == 1){
+          if(prevX != -99 && prevX != vdata->bestsolX[j]){
+            emptyHeights[count] = tmpEmptyHeight;
+            emptyHeightsBinIds[count] = tmpEmptyHeightBinId;
+            emptyHeightsX[count] = tmpEmptyHeightX;
+            count++;
+          }
+          prevX = vdata->bestsolX[j];
+          tmpEmptyHeight = 3210 - (vdata->bestsolH[j] + vdata->bestsolY[j]);  
+          tmpEmptyHeightBinId = vdata->bestsolB[j];
+          tmpEmptyHeightX = vdata->bestsolX[j];
+        }else{
+          emptyHeights[count] = 3210 - (vdata->bestsolH[j] + vdata->bestsolY[j]);
+          emptyHeightsBinIds[count] = vdata->bestsolB[j];
+          emptyHeightsX[count] = vdata->bestsolX[j];
+          isTrue = true;
+        }
+      }
+    }
+    if(isTrue){
+      count++;
+    }
+  }
+
+  int tmpX = -99;
+  count2 = 0;
+  count3 = 0;
+  for(i = 0;i < binCounts;i++){
+    for(j = 0;j < n;j++){
+      int count4 = 0;
+      if(vdata->bestsolB[j] == i && vdata->bestsolX[j] != tmpX){
+        tmpX = vdata->bestsolX[j];
+        for(k = 0;k < n;k++){
+          if(tmpX == vdata->bestsolX[k] && i == vdata->bestsolB[k]){
+            for(l = 0;l < columnPos;l++){
+              if(emptyHeightsBinIds[l] != vdata->bestsolB[j] && emptyHeightsX[l] != vdata->bestsolX[j] && emptyHeightsBinIds[l] != -99 && !(array_count_values(uniqIndex, SIZE_OF_ARRAY(uniqIndex), l)) && vdata->bestsolW[k] <= xToMaxWidth(emptyHeightsBinIds[l],emptyHeightsX[l],n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW) && vdata->bestsolH[k] <= emptyHeights[l]){
+                uniqIndex[count3] = l;
+                count3++;
+                count4++;
+                break;
+              }
+            }
+          }
+        }
+        if(count4 == xToItemCounts(vdata->bestsolB[j],vdata->bestsolX[j],n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW)){
+          tmpBinIds[count2] = vdata->bestsolB[j];
+          tmpXs[count2] = vdata->bestsolX[j];
+          count2++; 
+        }
+      }
+      if(tmpX == 0){
+        tmpX = -99;
+      }
+    }
+  }
+
+  for(i = 0;i < n;i++){
+    uniqIndex[i] = -99;
+  }
+
+  int tmpBinId = -99;
+  tmpX = -99;
+  count2 = 0;
+  for(i = 0;i < n;i++){
+    if(tmpBinIds[i] != -99){
+      for(j = 0;j < n;j++){
+        if(tmpBinIds[i] == vdata->bestsolB[j] && tmpXs[i] == vdata->bestsolX[j]){
+          for(k = 0;k < columnPos;k++){
+            if(emptyHeightsBinIds[k] != -99 && !(array_count_values(uniqIndex, SIZE_OF_ARRAY(uniqIndex), k)) && vdata->bestsolW[j] <= xToMaxWidth(emptyHeightsBinIds[k],emptyHeightsX[k],n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW) && vdata->bestsolH[j] <= emptyHeights[k]){
+              vdata->bestsolX[j] = emptyHeightsX[k];
+              vdata->bestsolB[j] = emptyHeightsBinIds[k];
+              vdata->bestsolY[j] = 3210 - emptyHeights[k];
+              uniqIndex[count2] = k;
+              count2++;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /***** 高さここまで ******************************************************************/
+
+
   // 以下、幅について考える
+  /***** 幅ここから ******************************************************************/
 
   // 以下、空いたスペースにアイテムを積む、左に寄せるを繰り返す
   count2 = 0;
+  isTrue = true;
   while (isTrue){
     for(i = 0;i < binCounts;i++){
       lastEmptyWidthArray[i] = -99;
     }
 
-    int prevX = -99;
-    int prevWidth = -99;
+    prevX = -99;
 
     for(i = 0;i < binCounts;i++){
       if(binIdToLastX(i,n,vdata->bestsolB,vdata->bestsolX) == -99){
@@ -489,7 +648,7 @@ void my_algorithm(RectData *rectdata, Vdata *vdata){
     for(i = 0;i < binCounts;i++){
       if(binIdToLastX(i,n,vdata->bestsolB,vdata->bestsolX) != -99){
         for(j = 0;j < n;j++){
-          if(prevX != -99 && prevX != vdata->bestsolX[j] && i < vdata->bestsolB[j] && lastEmptyWidthArray[i] >= vdata->bestsolW[j]){
+          if(prevX != -99 && prevX != vdata->bestsolX[j] && i < vdata->bestsolB[j] && lastEmptyWidthArray[i] >= xToMaxWidth(vdata->bestsolB[j],vdata->bestsolX[j],n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW)){
             int binId = vdata->bestsolB[j];
             int x = vdata->bestsolX[j];
             binIds[count] = binId;
@@ -501,8 +660,6 @@ void my_algorithm(RectData *rectdata, Vdata *vdata){
               if(vdata->bestsolB[k] == binId && vdata->bestsolX[k] == x){
                 vdata->bestsolB[k] = i;
                 vdata->bestsolX[k] = 6000 - lastEmptyWidthArray[i];
-              }else{
-                break;
               }
             }
             prevX = -99;
@@ -542,18 +699,7 @@ void my_algorithm(RectData *rectdata, Vdata *vdata){
     count2++;
   }
 
-  // 以下、高さについて考える
-
-  count = 0;
-  for(i = 0;i < n;i++){
-  }
-
-
-
-
-
-
-
+  /***** 幅ここまで ******************************************************************/
 
 
 
@@ -566,11 +712,10 @@ void my_algorithm(RectData *rectdata, Vdata *vdata){
   //   printf("binIdToLastWidth(i,n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW): %d\n",binIdToLastWidth(i,n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW));
   // }
 
-  // for(i = 0;i < n;i++){
-  //   printf("binIds: %d\n",binIds[i]);
-  //   printf("selectedWidth: %d\n",selectedWidth[i]);
-  //   printf("selectedX: %d\n",selectedX[i]);
-  //   printf("selectedXSorted: %d\n",selectedXSorted[i]);
+  // for(i = 0;i < columnPos;i++){
+  //   printf("emptyHeightsBinIds: %d\n",emptyHeightsBinIds[i]);
+  //   printf("emptyHeights: %d\n",emptyHeights[i]);
+  //   printf("emptyHeightsX: %d\n",emptyHeightsX[i]);
   // }
 
   for(i = 0;i < n;i++){
@@ -580,6 +725,9 @@ void my_algorithm(RectData *rectdata, Vdata *vdata){
     // printf("bestsolH: %d\n",vdata->bestsolH[i]);
     // printf("bestsolX: %d\n",vdata->bestsolX[i]);
     // printf("bestsolY: %d\n",vdata->bestsolY[i]);
+    // printf("binCounts: %d\n",binCounts);
+    // printf("tmpBinIds: %d\n",tmpBinIds[i]);
+    // printf("tmpXs: %d\n",tmpXs[i]);
   }
 
 	free(NumRectInCol); free(WidthOfCol);
