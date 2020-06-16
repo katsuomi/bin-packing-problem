@@ -522,6 +522,7 @@ void my_algorithm(RectData *rectdata, Vdata *vdata){
   int emptyHeights[columnPos]; // それぞれの列の高さの余りを保持する配列 一番最後の列に関しては、値が入っていない(-99)ので注意
   int emptyHeightsBinIds[columnPos]; // ↑に対応するビンIDを保持する配列 一番最後の列に関しては、値が入っていない(-99)ので注意
   int emptyHeightsX[columnPos]; // ↑に対応するX座標を保持する配列 一番最後の列に関しては、値が入っていない(-99)ので注意
+  int emptyHeightsMaxW[columnPos]; // ↑に対応するもっとも大きいwidth値を保持する配列 一番最後の列に関しては、値が入っていない(-99)ので注意
   int tmpBinIds[n];
   int tmpXs[n];
   int tmpWs[n];
@@ -696,92 +697,166 @@ void my_algorithm(RectData *rectdata, Vdata *vdata){
 
   // 以下、空いたスペースにアイテムを積む、左に寄せるを繰り返す
 
-  count2 = 0;
-  isTrue = true;
-  while (isTrue){
-    for(i = 0;i < binCounts;i++){
-      lastEmptyWidthArray[i] = -99;
-    }
-
-    int prevX = -99;
-
-    for(i = 0;i < binCounts;i++){
-      if(binIdToLastX(i,n,vdata->bestsolB,vdata->bestsolX) == -99){
-        lastEmptyWidthArray[i] = 0;
-      }else{
-        lastEmptyWidthArray[i] = 6000 - (binIdToLastX(i,n,vdata->bestsolB,vdata->bestsolX) + binIdToLastWidth(i,n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW));
-      }
-    }
-
-    // 詰める処理
-    for(i = 0;i < n;i++){ 
-      binIds[i] = -99;
-      selectedWidth[i] = -99;
-      selectedX[i] = -99;
-      selectedXSorted[i] = -99;
-    }
-
-   prevX = -99;
-   count = 0;
-    for(i = 0;i < binCounts;i++){
-      if(binIdToLastX(i,n,vdata->bestsolB,vdata->bestsolX) != -99){
-        for(j = 0;j < n;j++){
-          if(prevX != -99 && prevX != vdata->bestsolX[j] && i < vdata->bestsolB[j] && lastEmptyWidthArray[i] >= xToMaxWidth(vdata->bestsolB[j],vdata->bestsolX[j],n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW)){
-            int binId = vdata->bestsolB[j];
-            int x = vdata->bestsolX[j];
-            binIds[count] = binId;
-            selectedWidth[count] = vdata->bestsolW[j];
-            selectedX[count] = x;
-            count++;
-
-            for(k = j;k < n;k++){
-              if(vdata->bestsolB[k] == binId && vdata->bestsolX[k] == x){
-                vdata->bestsolB[k] = i;
-                vdata->bestsolX[k] = 6000 - lastEmptyWidthArray[i];
-              }
-            }
-            prevX = -99;
-            break;
-          }
-          prevX = vdata->bestsolX[j];
-        }
-      }
-    }
-
-    if(count == 0){
-      isTrue = false;
-    }
-
-    // 左にずらす処理
-
-    for(i = 0;i < n;i++){
-      selectedXSorted[i] = selectedX[i];
-    }
-
-    qsort(selectedXSorted, n, sizeof(int), compare_int);
-
-    for(i = 0;i < n;i++){
-      if(selectedXSorted[i] != -99){
-        for(j = 0;j < n;j++){
-        if(binIds[j] != -99 && selectedXSorted[i] == selectedX[j]){
-          for(k = 0;k < n;k++){
-            if(binIds[j] == vdata->bestsolB[k] && vdata->bestsolX[k] > selectedX[j]){
-              vdata->bestsolX[k] = vdata->bestsolX[k] - selectedWidth[j];
-            }
-          }
-          selectedX[j] = -99;
-        }
-        }
-      }
-    }
-    count2++;
+count2 = 0;
+isTrue = true;
+while (isTrue){
+  for(i = 0;i < binCounts;i++){
+    lastEmptyWidthArray[i] = -99;
   }
+
+  int prevX = -99;
+
+  for(i = 0;i < binCounts;i++){
+    if(binIdToLastX(i,n,vdata->bestsolB,vdata->bestsolX) == -99){
+      lastEmptyWidthArray[i] = 0;
+    }else{
+      lastEmptyWidthArray[i] = 6000 - (binIdToLastX(i,n,vdata->bestsolB,vdata->bestsolX) + binIdToLastWidth(i,n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW));
+    }
+  }
+
+  // 詰める処理
+  for(i = 0;i < n;i++){ 
+    binIds[i] = -99;
+    selectedWidth[i] = -99;
+    selectedX[i] = -99;
+    selectedXSorted[i] = -99;
+  }
+
+ prevX = -99;
+ count = 0;
+  for(i = 0;i < binCounts;i++){
+    if(binIdToLastX(i,n,vdata->bestsolB,vdata->bestsolX) != -99){
+      for(j = 0;j < n;j++){
+        if(prevX != -99 && prevX != vdata->bestsolX[j] && i < vdata->bestsolB[j] && lastEmptyWidthArray[i] >= xToMaxWidth(vdata->bestsolB[j],vdata->bestsolX[j],n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW)){
+          int binId = vdata->bestsolB[j];
+          int x = vdata->bestsolX[j];
+          binIds[count] = binId;
+          selectedWidth[count] = vdata->bestsolW[j];
+          selectedX[count] = x;
+          count++;
+
+          for(k = j;k < n;k++){
+            if(vdata->bestsolB[k] == binId && vdata->bestsolX[k] == x){
+              vdata->bestsolB[k] = i;
+              vdata->bestsolX[k] = 6000 - lastEmptyWidthArray[i];
+            }
+          }
+          prevX = -99;
+          break;
+        }
+        prevX = vdata->bestsolX[j];
+      }
+    }
+  }
+
+  if(count == 0){
+    isTrue = false;
+  }
+
+  // 左にずらす処理
+
+  for(i = 0;i < n;i++){
+    selectedXSorted[i] = selectedX[i];
+  }
+
+  qsort(selectedXSorted, n, sizeof(int), compare_int);
+
+  for(i = 0;i < n;i++){
+    if(selectedXSorted[i] != -99){
+      for(j = 0;j < n;j++){
+      if(binIds[j] != -99 && selectedXSorted[i] == selectedX[j]){
+        for(k = 0;k < n;k++){
+          if(binIds[j] == vdata->bestsolB[k] && vdata->bestsolX[k] > selectedX[j]){
+            vdata->bestsolX[k] = vdata->bestsolX[k] - selectedWidth[j];
+          }
+        }
+        selectedX[j] = -99;
+      }
+      }
+    }
+  }
+  count2++;
+}
 
   /***** 幅ここまで ******************************************************************/
 
 
   /***** 工夫ここから ******************************************************************/
+    // int maxHeightOfCols[columnPos];
+    // int totalWidthOfCols[columnPos];
+    // int binIdOfCols[columnPos];
+    // int xOfCols[columnPos];
 
+    // for(i = 0;i < n;i++){
+    //   tmpBinIds[i] = -99;
+    //   tmpXs[i] = -99;
+    // }
+
+    // for(i = 0;i < columnPos;i++){
+    //   emptyHeights[i] = -99;
+    //   emptyHeightsBinIds[i] = -99;
+    //   emptyHeightsX[i] = -99;
+    //   emptyHeightsMaxW[i] = -99;
+    //   maxHeightOfCols[i] = -99;
+    //   totalWidthOfCols[i] = -99;
+    //   binIdOfCols[i] = -99;
+    //   xOfCols[i] = -99;
+    // }
+
+    // int prevX = -99;
+    // count = 0;
+    // for(i = 0;i < binCounts;i++){
+    //   isTrue = false;
+    //   for(j = 0;j < n;j++){
+    //     if(vdata->bestsolB[j] == i){
+    //       if(binIdToIsManyCols(vdata->bestsolB[j],n,vdata->bestsolB,vdata->bestsolX) == 1){
+    //         if(prevX != vdata->bestsolX[j] && (!(array_count_values(tmpBinIds, SIZE_OF_ARRAY(tmpBinIds), vdata->bestsolB[j])) && !(array_count_values(tmpXs, SIZE_OF_ARRAY(tmpXs), vdata->bestsolX[j])))){
+    //           tmpBinIds[count] = vdata->bestsolB[j];
+    //           tmpXs[count] = vdata->bestsolX[j];
+    //           emptyHeights[count] = 3210 - xToColHeight(vdata->bestsolB[j],vdata->bestsolX[j],n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolY,vdata->bestsolH);
+    //           emptyHeightsBinIds[count] = vdata->bestsolB[j];
+    //           emptyHeightsX[count] = vdata->bestsolX[j];
+    //           emptyHeightsMaxW[count] = xToMaxWidth(vdata->bestsolB[j],vdata->bestsolX[j],n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW);
+    //           count++;
+    //         }
+    //         prevX = vdata->bestsolX[j];
+    //       }else{
+    //         tmpBinIds[count] = vdata->bestsolB[j];
+    //         tmpXs[count] = vdata->bestsolX[j];
+    //         emptyHeights[count] = 3210 - xToColHeight(vdata->bestsolB[j],vdata->bestsolX[j],n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolY,vdata->bestsolH);
+    //         emptyHeightsBinIds[count] = vdata->bestsolB[j];
+    //         emptyHeightsX[count] = vdata->bestsolX[j];
+    //         emptyHeightsMaxW[count] = xToMaxWidth(vdata->bestsolB[j],vdata->bestsolX[j],n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolW);
+    //         isTrue = true;
+    //       }
+    //     }
+    //   }
+    //   if(isTrue){
+    //     count++;
+    //   }
+    // }
+
+    // count = 0;
+    // for(i = 0;i < n;i++){
+    //   int tmpSumOfW = 0;
+    //   int tmpH = 0;
+    //   if((!(array_count_values(tmpBinIds, SIZE_OF_ARRAY(tmpBinIds), vdata->bestsolB[i])) && !(array_count_values(tmpXs, SIZE_OF_ARRAY(tmpXs), vdata->bestsolX[i])))){
+    //     for(j = 0;j < n;j++){
+    //       if(vdata->bestsolB[i] == vdata->bestsolB[j] && vdata->bestsolX[i] == vdata->bestsolX[j]){
+    //         tmpSumOfW += vdata->bestsolW[j];
+    //         if(vdata->bestsolH[j] > tmpH){
+    //           tmpH = vdata->bestsolH[j];
+    //         }
+    //       }
+    //     }
+    //     maxHeightOfCols[count] = tmpH;
+    //     totalWidthOfCols[count] = tmpSumOfW;
+    //     binIdOfCols[count] = vdata->bestsolB[i];
+    //     xOfCols[count] = vdata->bestsolX[i];
+    //     tmpBinIds[i] = vdata->bestsolB[i];
+    //     tmpXs[i] = vdata->bestsolX[i];
+    //   }
+    // }
 
   /***** 工夫ここまで ******************************************************************/
 
@@ -803,18 +878,18 @@ void my_algorithm(RectData *rectdata, Vdata *vdata){
   //   // printf("xToColHeight: %d\n",xToColHeight(0,0,n,vdata->bestsolB,vdata->bestsolX,vdata->bestsolY,vdata->bestsolH));
   // }
 
-  for(i = 0;i < n;i++){
-  //   // printf("bestsolB: %d\n",vdata->bestsolB[i]);
-  //   // printf("bestsolId: %d\n",vdata->bestsolId[i]);
-  //   // printf("bestsolW: %d\n",vdata->bestsolW[i]);
-  //   // printf("bestsolH: %d\n",vdata->bestsolH[i]);
-  //   // printf("bestsolX: %d\n",vdata->bestsolX[i]);
-  //   // printf("bestsolY: %d\n",vdata->bestsolY[i]);
-  //   // // printf("binCounts: %d\n",binCounts);
-    printf("tmpBinIds: %d\n",tmpBinIds[i]);
-    printf("tmpXs: %d\n",tmpXs[i]);
-  //   // printf("xToItemCounts: %d\n",xToItemCounts(8,1889,n,vdata->bestsolB,vdata->bestsolX));
-  }
+  // for(i = 0;i < n;i++){
+  // //   // printf("bestsolB: %d\n",vdata->bestsolB[i]);
+  // //   // printf("bestsolId: %d\n",vdata->bestsolId[i]);
+  // //   // printf("bestsolW: %d\n",vdata->bestsolW[i]);
+  // //   // printf("bestsolH: %d\n",vdata->bestsolH[i]);
+  // //   // printf("bestsolX: %d\n",vdata->bestsolX[i]);
+  // //   // printf("bestsolY: %d\n",vdata->bestsolY[i]);
+  // //   // // printf("binCounts: %d\n",binCounts);
+  //   // printf("tmpBinIds: %d\n",tmpBinIds[i]);
+  //   // printf("tmpXs: %d\n",tmpXs[i]);
+  // //   // printf("xToItemCounts: %d\n",xToItemCounts(8,1889,n,vdata->bestsolB,vdata->bestsolX));
+  // }
 
 	free(NumRectInCol); free(WidthOfCol);
 }
