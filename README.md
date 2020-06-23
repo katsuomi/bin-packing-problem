@@ -55,6 +55,7 @@ The objective is to minimize the amount of bin usage. In this paper, we use a si
 本研究で取り扱う出力は以下の通りである.
 
 • 使用したビンの数
+
 • ビンの充填率
 
 充填率を, 以下のように定義する:
