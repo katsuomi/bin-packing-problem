@@ -429,14 +429,14 @@ void my_algorithm(RectData *rectdata, Vdata *vdata){
   int count3 = 0;
   bool isTrue = true;
   bool isOk = false;
-  int dataWidth[n]; // アイテムのwidthを降順でソートした配列
-  int dataWidthIndex[n]; // アイテムのwidthを降順でソートした配列(index番号を保持)
-  int uniqIndex[n]; // 一度確定したIndex番号を保持
-  int uniqIndex2[n]; // 一度確定したIndex番号を保持2
-  int binIds[n]; // ビンIDを保持する配列
-  int selectedWidth[n]; // 選ばれたwidth値を保持する配列
-  int selectedX[n]; // 選ばれたX座標を保持する配列
-  int selectedXSorted[n]; // 選ばれたX座標を大きい順で保持する配列
+  int *dataWidth = (int *)malloc_e(n * sizeof(int)); // アイテムのwidthを降順でソートした配列
+  int *dataWidthIndex = (int *)malloc_e(n * sizeof(int)); // アイテムのwidthを降順でソートした配列
+  int *binIds = (int *)malloc_e(n * sizeof(int)); // アイテムのwidthを降順でソートした配列
+  int *selectedWidth = (int *)malloc_e(n * sizeof(int)); // アイテムのwidthを降順でソートした配列
+  int *selectedX = (int *)malloc_e(n * sizeof(int)); // アイテムのwidthを降順でソートした配列
+  int *selectedXSorted = (int *)malloc_e(n * sizeof(int)); // アイテムのwidthを降順でソートした配列
+  int uniqIndex[n]; // アイテムのwidthを降順でソートした配列
+  int uniqIndex2[n]; // アイテムのwidthを降順でソートした配列
 
 	for(i = 0;i < n;i++){
 		NumRectInCol[i] = -99; 
@@ -891,7 +891,7 @@ while (isTrue){
   // //   // printf("xToItemCounts: %d\n",xToItemCounts(8,1889,n,vdata->bestsolB,vdata->bestsolX));
   // }
 
-	free(NumRectInCol); free(WidthOfCol);
+	free(NumRectInCol);free(WidthOfCol);free(dataWidth);free(dataWidthIndex);free(binIds);free(selectedWidth);free(selectedX);free(selectedXSorted);
 }
 
 int main(int argc,char *argv[]){
